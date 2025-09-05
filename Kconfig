@@ -1,25 +1,27 @@
-#
-# Copyright (c) 2018 Nordic Semiconductor
-#
-# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
-#
+# SPDX-License-Identifier: Apache-2.0
+
+config NFC_CHARGER_APP
+	bool "NFC Charger Application"
+	default y
+	help
+	  Enable the NFC charger application with ST25R3916B support.
+
+if NFC_CHARGER_APP
+
+config ST25R3916B_DRIVER
+	bool "ST25R3916B NFC Reader Driver"
+	default y
+	depends on SPI
+	help
+	  Enable ST25R3916B NFC reader chip driver.
+
+config OPA323_ADC_CONTROL
+	bool "OPA323 ADC Control for Ambient Light"
+	default y
+	depends on ADC && PWM
+	help
+	  Enable ambient light sensing and LED brightness control.
+
+endif # NFC_CHARGER_APP
 
 source "Kconfig.zephyr"
-
-menu "Nordic LED-Button BLE GATT service sample"
-
-config BT_LBS_SECURITY_ENABLED
-	bool "Enable security"
-	default y
-	select BT_SMP
-	select BT_SETTINGS
-	select FLASH
-	select FLASH_PAGE_LAYOUT
-	select FLASH_MAP
-	select ZMS if (SOC_FLASH_NRF_RRAM || SOC_FLASH_NRF_MRAM)
-	select NVS if !(SOC_FLASH_NRF_RRAM || SOC_FLASH_NRF_MRAM)
-	select SETTINGS
-	help
-	  "Enable BLE security for the LED-Button service"
-
-endmenu

@@ -1,268 +1,310 @@
-/*
- * Copyright (c) 2018 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
- */
-
-#include <zephyr/types.h>
-#include <stddef.h>
-#include <string.h>
-#include <errno.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
-#include <soc.h>
-
+#include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/services/bas.h>
+#include <zephyr/bluetooth/services/dis.h>
 
-#include <bluetooth/services/lbs.h>
+#include "st25r3916b_driver.h"
+#include "opa323_adc_control.h"
 
-#include <zephyr/settings/settings.h>
+LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-#include <dk_buttons_and_leds.h>
+#define DEVICE_NAME         CONFIG_BT_DEVICE_NAME
+#define DEVICE_NAME_LEN     (sizeof(DEVICE_NAME) - 1)
 
-#define DEVICE_NAME             CONFIG_BT_DEVICE_NAME
-#define DEVICE_NAME_LEN         (sizeof(DEVICE_NAME) - 1)
-
-
-#define RUN_STATUS_LED          DK_LED1
-#define CON_STATUS_LED          DK_LED2
-#define RUN_LED_BLINK_INTERVAL  1000
-
-#define USER_LED                DK_LED3
-
-#define USER_BUTTON             DK_BTN1_MSK
-
-static bool app_button_state;
-static struct k_work adv_work;
-
+// BLE advertising data
 static const struct bt_data ad[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
+    BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+    BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
+    BT_DATA_BYTES(BT_DATA_UUID16_ALL,
+                  BT_UUID_16_ENCODE(BT_UUID_BAS_VAL),
+                  BT_UUID_16_ENCODE(BT_UUID_DIS_VAL)),
 };
 
+// BLE scan response data
 static const struct bt_data sd[] = {
-	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_LBS_VAL),
+    BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
 };
 
-static void adv_work_handler(struct k_work *work)
-{
-	int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+// RF field state tracking
+static bool rf_field_active = false;
+static uint8_t initial_no_coil_amplitude = 0;
+static bool baseline_calibrated = false;
 
-	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
-		return;
-	}
+// Coil detection thresholds - adjust based on calibration
+#define RF_AMP_BASELINE_THRESHOLD_LOW  0x10
+#define RF_AMP_COIL_DETECT_DROP        0x08
 
-	printk("Advertising successfully started\n");
-}
-
-static void advertising_start(void)
-{
-	k_work_submit(&adv_work);
-}
+// Battery simulation
+static uint8_t battery_level = 100;
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
-	if (err) {
-		printk("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
-		return;
-	}
+    char addr[BT_ADDR_LE_STR_LEN];
 
-	printk("Connected\n");
+    if (err) {
+        LOG_ERR("Connection failed (err %u)", err);
+        return;
+    }
 
-	dk_set_led_on(CON_STATUS_LED);
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_INF("Connected %s", addr);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	printk("Disconnected, reason 0x%02x %s\n", reason, bt_hci_err_to_str(reason));
+    char addr[BT_ADDR_LE_STR_LEN];
 
-	dk_set_led_off(CON_STATUS_LED);
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_INF("Disconnected from %s (reason %u)", addr, reason);
 }
-
-static void recycled_cb(void)
-{
-	printk("Connection object available from previous conn. Disconnect is complete!\n");
-	advertising_start();
-}
-
-#ifdef CONFIG_BT_LBS_SECURITY_ENABLED
-static void security_changed(struct bt_conn *conn, bt_security_t level,
-			     enum bt_security_err err)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	if (!err) {
-		printk("Security changed: %s level %u\n", addr, level);
-	} else {
-		printk("Security failed: %s level %u err %d %s\n", addr, level, err,
-		       bt_security_err_to_str(err));
-	}
-}
-#endif
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
-	.connected        = connected,
-	.disconnected     = disconnected,
-	.recycled         = recycled_cb,
-#ifdef CONFIG_BT_LBS_SECURITY_ENABLED
-	.security_changed = security_changed,
-#endif
+    .connected = connected,
+    .disconnected = disconnected,
 };
 
-#if defined(CONFIG_BT_LBS_SECURITY_ENABLED)
-static void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
+static void bt_ready(int err)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
+    if (err) {
+        LOG_ERR("Bluetooth init failed (err %d)", err);
+        return;
+    }
 
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_INF("Bluetooth initialized");
 
-	printk("Passkey for %s: %06u\n", addr, passkey);
+    err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+    if (err) {
+        LOG_ERR("Advertising failed to start (err %d)", err);
+        return;
+    }
+
+    LOG_INF("Advertising successfully started");
 }
 
-static void auth_cancel(struct bt_conn *conn)
+static void bas_notify(void)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
+    battery_level--;
+    if (battery_level == 0) {
+        battery_level = 100;
+    }
 
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	printk("Pairing cancelled: %s\n", addr);
+    bt_bas_set_battery_level(battery_level);
 }
 
-static void pairing_complete(struct bt_conn *conn, bool bonded)
+static void configure_system_settings(void)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
+    uint8_t io_config_reg2_val;
+    
+    // Read current IO Configuration Register 2 (0x01)
+    if (st25r391x_read_register(0x01, &io_config_reg2_val) != 0) {
+        LOG_ERR("Failed to read IO config register");
+        return;
+    }
+    
+    LOG_INF("ST25R: IO_CONFIG_REG_2 (0x01) before config: 0x%02X", io_config_reg2_val);
 
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    // Set sup3V bit (bit 7) to 1 for 3.3V supply mode
+    io_config_reg2_val |= (1U << 7); 
+    // Set io_drv_lvl bit (bit 2) to 1 to increase IO driving level
+    io_config_reg2_val |= (1U << 2);
 
-	printk("Pairing completed: %s, bonded: %d\n", addr, bonded);
+    if (st25r391x_write_register(0x01, io_config_reg2_val) == 0) {
+        LOG_INF("ST25R: IO_CONFIG_REG_2 (0x01) after config (sup3V=1, io_drv_lvl=1): 0x%02X", io_config_reg2_val);
+    }
 }
 
-static void pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
+// Work queue for periodic tasks
+static void battery_work_handler(struct k_work *work);
+static void led_update_work_handler(struct k_work *work);
+static void rf_detection_work_handler(struct k_work *work);
+
+K_WORK_DEFINE(battery_work, battery_work_handler);
+K_WORK_DEFINE(led_update_work, led_update_work_handler);
+K_WORK_DEFINE(rf_detection_work, rf_detection_work_handler);
+
+// Timers
+static void battery_timer_handler(struct k_timer *timer);
+static void led_timer_handler(struct k_timer *timer);
+static void rf_timer_handler(struct k_timer *timer);
+
+K_TIMER_DEFINE(battery_timer, battery_timer_handler, NULL);
+K_TIMER_DEFINE(led_timer, led_timer_handler, NULL);
+K_TIMER_DEFINE(rf_timer, rf_timer_handler, NULL);
+
+static void battery_work_handler(struct k_work *work)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	printk("Pairing failed conn: %s, reason %d %s\n", addr, reason,
-	       bt_security_err_to_str(reason));
+    bas_notify();
 }
 
-static struct bt_conn_auth_cb conn_auth_callbacks = {
-	.passkey_display = auth_passkey_display,
-	.cancel = auth_cancel,
-};
-
-static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
-	.pairing_complete = pairing_complete,
-	.pairing_failed = pairing_failed
-};
-#else
-static struct bt_conn_auth_cb conn_auth_callbacks;
-static struct bt_conn_auth_info_cb conn_auth_info_callbacks;
-#endif
-
-static void app_led_cb(bool led_state)
+static void led_update_work_handler(struct k_work *work)
 {
-	dk_set_led(USER_LED, led_state);
+    update_led_brightness_from_adc();
 }
 
-static bool app_button_cb(void)
+static void rf_detection_work_handler(struct k_work *work)
 {
-	return app_button_state;
+    if (!baseline_calibrated) {
+        // Calibrate baseline RF amplitude without coil
+        LOG_INF("Calibrating RF amplitude baseline without coil...");
+        
+        if (enable_charging() == 0) {
+            k_msleep(100); // Give field time to stabilize
+            initial_no_coil_amplitude = st25r3916b_measure_rf_amplitude();
+            disable_charging(); // Turn OFF RF field immediately after measurement
+            
+            LOG_INF("Baseline RF Amp (no coil): 0x%02X", initial_no_coil_amplitude);
+            
+            if (initial_no_coil_amplitude > 0) {
+                baseline_calibrated = true;
+                LOG_INF("RF amplitude baseline calibrated. Ready for coil detection.");
+            } else {
+                LOG_WRN("Failed to get a valid RF amplitude baseline. Retrying...");
+            }
+        }
+        return;
+    }
+
+    // Detect coil using amplitude measurement
+    uint8_t current_rf_amplitude;
+    bool coil_detected = false;
+
+    // Turn ON RF field momentarily to "ping" for coil presence
+    if (enable_charging() == 0) {
+        k_msleep(50); // Short delay for field stability
+        current_rf_amplitude = st25r3916b_measure_rf_amplitude();
+        disable_charging(); // Turn OFF RF field immediately after measurement
+
+        LOG_INF("Pinged RF Amp: 0x%02X", current_rf_amplitude);
+
+        // Logic to detect coil: amplitude drops significantly when coil is present
+        if (initial_no_coil_amplitude > RF_AMP_BASELINE_THRESHOLD_LOW &&
+            (initial_no_coil_amplitude - current_rf_amplitude) >= RF_AMP_COIL_DETECT_DROP) {
+            coil_detected = true;
+        }
+
+        // Decision to enable/disable continuous RF field
+        if (coil_detected) {
+            if (!rf_field_active) {
+                if (enable_charging() == 0) {
+                    set_led_charging(true);
+                    rf_field_active = true;
+                    LOG_INF("NFC Coil Detected. Charging Enabled (Continuous RF Field).");
+                }
+            }
+        } else {
+            if (rf_field_active) {
+                if (disable_charging() == 0) {
+                    set_led_charging(false);
+                    rf_field_active = false;
+                    LOG_INF("No NFC Coil Detected. Charging Disabled (RF Field OFF).");
+                }
+            }
+        }
+    }
 }
 
-static struct bt_lbs_cb lbs_callbacs = {
-	.led_cb    = app_led_cb,
-	.button_cb = app_button_cb,
-};
-
-static void button_changed(uint32_t button_state, uint32_t has_changed)
+static void battery_timer_handler(struct k_timer *timer)
 {
-	if (has_changed & USER_BUTTON) {
-		uint32_t user_button_state = button_state & USER_BUTTON;
-
-		bt_lbs_send_button_state(user_button_state);
-		app_button_state = user_button_state ? true : false;
-	}
+    k_work_submit(&battery_work);
 }
 
-static int init_button(void)
+static void led_timer_handler(struct k_timer *timer)
 {
-	int err;
+    k_work_submit(&led_update_work);
+}
 
-	err = dk_buttons_init(button_changed);
-	if (err) {
-		printk("Cannot init buttons (err: %d)\n", err);
-	}
-
-	return err;
+static void rf_timer_handler(struct k_timer *timer)
+{
+    k_work_submit(&rf_detection_work);
 }
 
 int main(void)
 {
-	int blink_status = 0;
-	int err;
+    int err;
 
-	printk("Starting Bluetooth Peripheral LBS sample\n");
+    LOG_INF("Slimiot NFC Charging App Started");
 
-	err = dk_leds_init();
-	if (err) {
-		printk("LEDs init failed (err %d)\n", err);
-		return 0;
-	}
+    // Initialize Bluetooth
+    err = bt_enable(bt_ready);
+    if (err) {
+        LOG_ERR("Bluetooth init failed (err %d)", err);
+        return 0;
+    }
 
-	err = init_button();
-	if (err) {
-		printk("Button init failed (err %d)\n", err);
-		return 0;
-	}
+    // Initialize ST25R3916B NFC/RFID components
+    err = st25r_spi_init();
+    if (err) {
+        LOG_ERR("ST25R SPI init failed (err %d)", err);
+        return 0;
+    }
 
-	if (IS_ENABLED(CONFIG_BT_LBS_SECURITY_ENABLED)) {
-		err = bt_conn_auth_cb_register(&conn_auth_callbacks);
-		if (err) {
-			printk("Failed to register authorization callbacks.\n");
-			return 0;
-		}
+    err = st25r_irq_init();
+    if (err) {
+        LOG_ERR("ST25R IRQ init failed (err %d)", err);
+        return 0;
+    }
 
-		err = bt_conn_auth_info_cb_register(&conn_auth_info_callbacks);
-		if (err) {
-			printk("Failed to register authorization info callbacks.\n");
-			return 0;
-		}
-	}
+    err = st25r3916b_initial_setup();
+    if (err) {
+        LOG_ERR("ST25R initial setup failed (err %d)", err);
+        return 0;
+    }
 
-	err = bt_enable(NULL);
-	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-		return 0;
-	}
+    configure_system_settings();
 
-	printk("Bluetooth initialized\n");
+    err = st25r3916b_prepare_for_rf_field();
+    if (err) {
+        LOG_ERR("ST25R RF field preparation failed (err %d)", err);
+        return 0;
+    }
 
-	if (IS_ENABLED(CONFIG_SETTINGS)) {
-		settings_load();
-	}
+    LOG_INF("ST25R3916B prepared for RF field operation");
 
-	err = bt_lbs_init(&lbs_callbacs);
-	if (err) {
-		printk("Failed to init LBS (err:%d)\n", err);
-		return 0;
-	}
+    // Initialize ambient light sensing and LED control
+    err = pwm_led_init();
+    if (err) {
+        LOG_ERR("PWM LED init failed (err %d)", err);
+        return 0;
+    }
 
-	k_work_init(&adv_work, adv_work_handler);
-	advertising_start();
+    err = saadc_init();
+    if (err) {
+        LOG_ERR("SAADC init failed (err %d)", err);
+        return 0;
+    }
 
-	for (;;) {
-		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
-		k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL));
-	}
+    err = leds_init();
+    if (err) {
+        LOG_ERR("LEDs init failed (err %d)", err);
+        return 0;
+    }
+
+    LOG_INF("All peripherals initialized successfully");
+
+    // Start periodic timers
+    k_timer_start(&battery_timer, K_SECONDS(2), K_SECONDS(2));
+    k_timer_start(&led_timer, K_MSEC(100), K_MSEC(100));
+    k_timer_start(&rf_timer, K_MSEC(500), K_MSEC(500));
+
+    LOG_INF("Timers started, entering main loop");
+
+    // Main loop - just handle IRQs and sleep
+    while (1) {
+        // Handle ST25R IRQ if pending
+        if (g_st25r_irq_pending) {
+            g_st25r_irq_pending = false;
+            LOG_INF("Processing ST25R IRQ");
+            // Additional IRQ processing can be added here if needed
+        }
+
+        // Sleep to allow work queue and interrupts to run
+        k_msleep(10);
+    }
+
+    return 0;
 }

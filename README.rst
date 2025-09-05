@@ -1,239 +1,230 @@
-.. _peripheral_lbs:
+# NFC Charger - nRF Connect SDK Migration
+
+This project has been migrated from nRF5 SDK to nRF Connect SDK 3.0.0 for the nRF52832 microcontroller.
+
+## Project Structure
+
+```
+nfc-charger/
+├── CMakeLists.txt                          # Main build configuration
+├── prj.conf                                # Zephyr project configuration
+├── Kconfig                                 # Custom Kconfig options
+├── west.yml                                # West manifest for dependencies
+├── boards/
+│   └── nrf52832dk_nrf52832.overlay        # Device tree overlay
+├── src/
+│   ├── main.c                             # Main application (migrated)
+│   ├── st25r3916b_driver.c               # ST25R3916B driver (migrated)
+│   ├── st25r3916b_driver.h               # ST25R3916B header (migrated)
+│   ├── opa323_adc_control.c              # ADC/LED control (migrated)
+│   └── opa323_adc_control.h              # ADC/LED header (migrated)
+└── README.md                              # This file
+```
+
+## Key Migration Changes
+
+### 1. Build System
+- **nRF5 SDK**: Used Segger Embedded Studio with proprietary build system
+- **nRF Connect SDK**: Uses CMake and Zephyr's build system
+
+### 2. Hardware Abstraction
+- **nRF5 SDK**: Direct register access and nRF5 HAL drivers
+- **nRF Connect SDK**: Zephyr's device driver model with device tree configuration
+
+### 3. RTOS Integration
+- **nRF5 SDK**: No built-in RTOS (bare metal with SoftDevice)
+- **nRF Connect SDK**: Zephyr RTOS with work queues and timers
 
-Bluetooth: Peripheral LBS
-#########################
+### 4. Bluetooth Stack
+- **nRF5 SDK**: SoftDevice S132/S140
+- **nRF Connect SDK**: Zephyr Bluetooth stack
+
+## Hardware Configuration
+
+The device tree overlay (`boards/nrf52832dk_nrf52832.overlay`) defines:
 
-.. contents::
-   :local:
-   :depth: 2
-
-The peripheral LBS sample demonstrates how to use the :ref:`lbs_readme`.
-
-Requirements
-************
-
-The sample supports the following development kits:
-
-.. table-from-sample-yaml::
-
-.. include:: /includes/tfm.txt
-
-The sample also requires a smartphone or tablet running a compatible mobile application.
-The `Testing`_ instructions refer to `nRF Connect for Mobile`_ and `nRF Blinky`_, but you can also use other similar applications, such as `nRF Toolbox`_.
-
-.. note::
-   |thingy53_sample_note|
-
-Overview
-********
-
-You can use the sample to transmit the button state from your development kit to another device.
-
-.. tabs::
-
-   .. group-tab:: nRF52 and nRF53 DKs
-
-      When connected, the sample sends the state of **Button 1** on the development kit to the connected device, such as a phone or tablet.
-      The mobile application on the device can display the received button state and control the state of **LED 3** on the development kit.
-
-   .. group-tab:: nRF54 DKs
-
-      When connected, the sample sends the state of **Button 0** on the development kit to the connected device, such as a phone or tablet.
-      The mobile application on the device can display the received button state and control the state of **LED 2** on the development kit.
-
-You can also use this sample to control the color of the RGB LED on the nRF52840 Dongle or Thingy:53.
-
-User interface
-**************
-
-The user interface of the sample depends on the hardware platform you are using.
-
-.. tabs::
-
-   .. group-tab:: nRF52 and nRF53 DKs
-
-      LED 1:
-         Blinks when the main loop is running (that is, the device is advertising) with a period of two seconds, duty cycle 50%.
-
-      LED 2:
-         Lit when the development kit is connected.
-
-      LED 3:
-         Lit when the development kit is controlled remotely from the connected device.
-
-      Button 1:
-         Send a notification with the button state: "pressed" or "released".
-
-   .. group-tab:: nRF54 DKs
-
-      LED 0:
-         Blinks when the main loop is running (that is, the device is advertising) with a period of two seconds, duty cycle 50%.
-
-      LED 1:
-         Lit when the development kit is connected.
-
-      LED 2:
-         Lit when the development kit is controlled remotely from the connected device.
-
-      Button 0:
-         Send a notification with the button state: "pressed" or "released".
-
-   .. group-tab:: Thingy:53
-
-      RGB LED:
-         The RGB LED channels are used independently to display the following information:
-
-         * Red - If the main loop is running (that is, the device is advertising).
-           The LED blinks with a period of two seconds, duty cycle 50%.
-         * Green - If the device is connected.
-         * Blue - If user set the LED using Nordic LED Button Service.
-
-         For example, if Thingy:53 is connected over Bluetooth, the LED color toggles between green and yellow.
-         The green LED channel is kept on and the red LED channel is blinking.
-
-      Button 1:
-         Send a notification with the button state: "pressed" or "released".
-
-   .. group-tab:: nRF52840 Dongle
-
-      Green LED:
-         Blinks, toggling on/off every second, when the main loop is running and the device is advertising.
-
-      RGB LED:
-         The RGB LED channels are used independently to display the following information:
-
-         * Red - If Dongle is connected.
-         * Green - If user set the LED using Nordic LED Button Service.
-
-      Button 1:
-         Send a notification with the button state: "pressed" or "released".
-
-Building and running
-********************
-
-.. |sample path| replace:: :file:`samples/bluetooth/peripheral_lbs`
-
-.. include:: /includes/build_and_run_ns.txt
-
-.. include:: /includes/nRF54H20_erase_UICR.txt
-
-Minimal build
-=============
-
-You can build the sample with a minimum configuration as a demonstration of how to reduce code size and RAM usage, using the ``-DFILE_SUFFIX=minimal`` flag in your build.
-
-See :ref:`cmake_options` for instructions on how to add this option to your build.
-For example, when building on the command line, you can add the option as follows:
-
-.. code-block:: console
-
-   west build samples/bluetooth/peripheral_lbs -- -DFILE_SUFFIX=minimal
-
-.. _peripheral_lbs_testing:
-
-Testing
-=======
-
-After programming the sample to your dongle or development kit, one of the LEDs starts blinking to indicate that the advertising loop is active (see `User interface`_ for details).
-
-
-.. tabs::
-
-   .. group-tab:: nRF Connect for Mobile
-
-      To test the sample using the `nRF Connect for Mobile`_ application, complete the following steps:
-
-      .. tabs::
-
-         .. group-tab:: nRF52 and nRF53 DKs
-
-            1. Install and start the `nRF Connect for Mobile`_ application on your smartphone or tablet.
-            #. Power on the development kit or insert your dongle into the USB port.
-            #. Connect to the device from the application.
-               The device is advertising as ``Nordic_LBS``.
-               The services of the connected device are shown.
-            #. In **Nordic LED Button Service**, enable notifications for the **Button** characteristic.
-            #. Press **Button 1** on the device.
-            #. Observe that notifications with the following values are displayed:
-
-               * ``Button released`` when **Button 1** is released.
-               * ``Button pressed`` when **Button 1** is pressed.
-
-            #. Write the following values to the LED characteristic in the **Nordic LED Button Service**.
-               Depending on the hardware platform, this produces results described in the table.
-
-               +------------------------+---------+----------------------------------------------+
-               | Hardware platform      | Value   | Effect                                       |
-               +========================+=========+==============================================+
-               | nRF52 and nRF53 DKs    | ``OFF`` | Switch the **LED 3** off.                    |
-               +                        +---------+----------------------------------------------+
-               |                        | ``ON``  | Switch the **LED 3** on.                     |
-               +------------------------+---------+----------------------------------------------+
-               | nRF52840 Dongle        | ``OFF`` | Switch the green channel of the RGB LED off. |
-               +                        +---------+----------------------------------------------+
-               |                        | ``ON``  | Switch the green channel of the RGB LED on.  |
-               +------------------------+---------+----------------------------------------------+
-               | Thingy:53              | ``OFF`` | Switch the blue channel of the RGB LED off.  |
-               +                        +---------+----------------------------------------------+
-               |                        | ``ON``  | Switch the blue channel of the RGB LED on.   |
-               +------------------------+---------+----------------------------------------------+
-
-         .. group-tab:: nRF54 DKs
-
-            .. note::
-               |nrf54_buttons_leds_numbering|
-
-            1. Install and start the `nRF Connect for Mobile`_ application on your smartphone or tablet.
-            #. Power on the development kit or insert your dongle into the USB port.
-            #. Connect to the device from the application.
-               The device is advertising as ``Nordic_LBS``.
-               The services of the connected device are shown.
-            #. In **Nordic LED Button Service**, enable notifications for the **Button** characteristic.
-            #. Press **Button 0** on the device.
-            #. Observe that notifications with the following values are displayed:
-
-               * ``Button released`` when **Button 0** is released.
-               * ``Button pressed`` when **Button 0** is pressed.
-
-            #. Write the following values to the LED characteristic in the **Nordic LED Button Service**.
-               Depending on the hardware platform, this produces results described in the table.
-
-               +------------------------+---------+----------------------------------------------+
-               | Hardware platform      | Value   | Effect                                       |
-               +========================+=========+==============================================+
-               | nRF54 DKs              | ``OFF`` | Switch the **LED 2** off.                    |
-               +                        +---------+----------------------------------------------+
-               |                        | ``ON``  | Switch the **LED 2** on.                     |
-               +------------------------+---------+----------------------------------------------+
-
-   .. group-tab:: nRF Blinky
-
-      To test the sample using the nRF Blinky mobile app, see the `nRF Blinky documentation`_.
-
-
-Dependencies
-************
-
-This sample uses the following |NCS| libraries:
-
-* :ref:`lbs_readme`
-* :ref:`dk_buttons_and_leds_readme`
-
-In addition, it uses the following Zephyr libraries:
-
-* :file:`include/zephyr/types.h`
-* :file:`lib/libc/minimal/include/errno.h`
-* :file:`include/sys/printk.h`
-* :file:`include/sys/byteorder.h`
-* :ref:`GPIO Interface <zephyr:api_peripherals>`
-* :ref:`zephyr:bluetooth_api`:
-
-  * :file:`include/bluetooth/bluetooth.h`
-  * :file:`include/bluetooth/hci.h`
-  * :file:`include/bluetooth/conn.h`
-  * :file:`include/bluetooth/uuid.h`
-  * :file:`include/bluetooth/gatt.h`
-
-The sample also uses the following secure firmware component:
-
-* :ref:`Trusted Firmware-M <ug_tfm>`
+- **SPI Interface**: For ST25R3916B communication
+  - SCK: P0.29
+  - MOSI: P0.28  
+  - MISO: P0.27
+  - CS: P0.16
+
+- **RGB LEDs with PWM**: For ambient light adaptation
+  - Red: P0.17
+  - Green: P0.19  
+  - Blue: P0.20
+
+- **ADC Channel**: For photodiode ambient light sensing
+  - Input: P0.03 (AIN1)
+
+- **IRQ Pin**: For ST25R3916B interrupt
+  - Pin: P0.31
+
+## Building the Project
+
+### Prerequisites
+1. Install nRF Connect SDK 3.0.0
+2. Install west tool
+3. Set up toolchain (GCC ARM Embedded)
+
+### Build Steps
+```bash
+# Initialize west workspace
+west init -m https://github.com/nrfconnect/sdk-nrf --mr v2.3.0 ncs
+cd ncs
+
+# Clone this project
+git clone <your-repo> nfc-charger
+cd nfc-charger
+
+# Update dependencies
+west update
+
+# Build the project
+west build -b nrf52832dk_nrf52832
+
+# Flash to device
+west flash
+```
+
+## Key Features Preserved
+
+### 1. NFC Wireless Charging
+- ST25R3916B RF field generation
+- Coil detection via amplitude measurement
+- Automatic charging enable/disable
+
+### 2. Ambient Light Adaptation
+- Photodiode-based light sensing
+- Logarithmic LED brightness scaling
+- Averaging filter for stability
+
+### 3. Bluetooth Low Energy
+- Battery service (BAS)
+- Device information service (DIS)
+- Advertising with device name
+
+### 4. Visual Feedback
+- Red LED: Normal operation (brightness varies with ambient light)
+- Green LED: Charging active (brightness varies with ambient light)
+
+## Configuration Options
+
+Key configurations in `prj.conf`:
+
+```ini
+# Bluetooth
+CONFIG_BT=y
+CONFIG_BT_PERIPHERAL=y
+CONFIG_BT_BAS=y
+CONFIG_BT_DIS=y
+
+# Hardware drivers
+CONFIG_SPI=y
+CONFIG_ADC=y
+CONFIG_PWM=y
+CONFIG_GPIO=y
+
+# Logging
+CONFIG_LOG=y
+CONFIG_LOG_DEFAULT_LEVEL=3
+```
+
+## Migration Notes
+
+### Challenges Addressed
+
+1. **Timer Management**: Converted from app_timer to Zephyr k_timer
+2. **Work Queues**: Replaced interrupt-driven code with work queue handlers
+3. **Device Tree**: Hardware configuration moved from C code to device tree
+4. **Error Handling**: Updated to use Zephyr error codes
+5. **Logging**: Migrated from NRF_LOG to Zephyr LOG
+
+### Code Changes
+
+1. **Header Changes**:
+   ```c
+   // Old (nRF5 SDK)
+   #include "nrf_drv_spi.h"
+   #include "app_error.h"
+   
+   // New (nRF Connect SDK)
+   #include <zephyr/drivers/spi.h>
+   #include <zephyr/kernel.h>
+   ```
+
+2. **Initialization Pattern**:
+   ```c
+   // Old: Direct device initialization
+   nrf_drv_spi_init(&spi, &config, handler, NULL);
+   
+   // New: Device tree based initialization
+   spi_dev = DEVICE_DT_GET(DT_ALIAS(st25_spi));
+   ```
+
+3. **Work Scheduling**:
+   ```c
+   // Old: Direct function calls in main loop
+   update_led_brightness_from_adc();
+   
+   // New: Work queue based
+   k_work_submit(&led_update_work);
+   ```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **SPI Communication Fails**
+   - Check device tree pin assignments
+   - Verify SPI mode configuration (Mode 1 for ST25R3916B)
+   - Ensure CS pin is correctly configured
+
+2. **ADC Readings Invalid**
+   - Verify ADC channel configuration in device tree
+   - Check reference voltage settings
+   - Ensure pin multiplexing is correct
+
+3. **PWM LEDs Not Working**
+   - Check PWM device tree configuration
+   - Verify pin assignments match hardware
+   - Ensure PWM frequency and polarity are correct
+
+4. **Bluetooth Not Advertising**
+   - Check that CONFIG_BT=y in prj.conf
+   - Verify device name configuration
+   - Ensure sufficient heap/stack sizes
+
+### Debug Tips
+
+- Enable verbose logging: `CONFIG_LOG_DEFAULT_LEVEL=4`
+- Use RTT for real-time logging during development
+- Check Zephyr documentation for driver-specific configurations
+- Use device tree overlays for board-specific customizations
+
+## Testing
+
+The migrated application maintains the same functionality:
+
+1. **RF Field Testing**: Place NFC coil near antenna to trigger charging mode
+2. **Light Adaptation**: Cover/uncover photodiode to see LED brightness change
+3. **Bluetooth**: Connect with nRF Connect app to see battery service
+4. **Visual Feedback**: LED color indicates charging state (red/green)
+
+## Future Enhancements
+
+Potential improvements enabled by nRF Connect SDK:
+
+1. **Power Management**: Utilize Zephyr's power management for better battery life
+2. **OTA Updates**: Implement MCUboot for over-the-air firmware updates  
+3. **Networking**: Add Thread/Matter support for IoT connectivity
+4. **Security**: Leverage PSA crypto APIs for enhanced security
+5. **Multi-threading**: Use Zephyr threads for more responsive operation
+
+## Support
+
+For issues with the migration:
+1. Check Zephyr and nRF Connect SDK documentation
+2. Review device tree bindings for your hardware
+3. Use nRF Connect SDK forums for community support
+4. Check Nordic's DevZone for nRF-specific questions
