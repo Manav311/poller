@@ -1,7 +1,0 @@
-default: poller
-build_dir: C:/Users/manav/OneDrive/Desktop/poller/build
-domains:
-  - name: poller
-    build_dir: C:/Users/manav/OneDrive/Desktop/poller/build/poller
-flash_order:
-  - poller
