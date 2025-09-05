@@ -1,21 +1,18 @@
+#-------------------------------------------------------------------------------
+# Zephyr Example Application
+#
+# Copyright (c) 2021 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-cmake_minimum_required(VERSION 3.20.0)
+cmake_minimum_required(VERSION 3.21)
 
-# Make sure we're not in sysbuild mode for this simple project
-set(BOARD nrf52832dk_nrf52832)
+# STEP 8.1 Add external module
+list(APPEND EXTRA_ZEPHYR_MODULES
+  ${CMAKE_CURRENT_SOURCE_DIR}/modules/zephyr/zephyr-st25r
+)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(nfc_charger)
 
-# Add source files
-target_sources(app PRIVATE
-    src/main.c
-    src/st25r3916b_driver.c
-    src/opa323_adc_control.c
-)
+project(app LANGUAGES C)
 
-# Add include directories
-target_include_directories(app PRIVATE
-    src/
-)
+target_sources(app PRIVATE src/main.c)

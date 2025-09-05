@@ -1,0 +1,7 @@
+default: app
+build_dir: C:/ncs-inter/l7/l7_e1_sol/app/build
+domains:
+  - name: app
+    build_dir: C:/ncs-inter/l7/l7_e1_sol/app/build/app
+flash_order:
+  - app

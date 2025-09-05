@@ -1,27 +1,15 @@
+# Copyright (c) 2021 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
+#
+# This file is the application Kconfig entry point. All application Kconfig
+# options can be defined here or included via other application Kconfig files.
+# You can browse these options using the west targets menuconfig (terminal) or
+# guiconfig (GUI).
 
-config NFC_CHARGER_APP
-	bool "NFC Charger Application"
-	default y
-	help
-	  Enable the NFC charger application with ST25R3916B support.
-
-if NFC_CHARGER_APP
-
-config ST25R3916B_DRIVER
-	bool "ST25R3916B NFC Reader Driver"
-	default y
-	depends on SPI
-	help
-	  Enable ST25R3916B NFC reader chip driver.
-
-config OPA323_ADC_CONTROL
-	bool "OPA323 ADC Control for Ambient Light"
-	default y
-	depends on ADC && PWM
-	help
-	  Enable ambient light sensing and LED brightness control.
-
-endif # NFC_CHARGER_APP
-
+menu "Zephyr"
 source "Kconfig.zephyr"
+endmenu
+
+module = APP
+module-str = APP
+source "subsys/logging/Kconfig.template.log_config"
