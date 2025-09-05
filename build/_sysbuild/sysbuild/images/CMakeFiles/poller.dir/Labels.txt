@@ -1,0 +1,13 @@
+# Target labels
+ poller
+# Source files and their labels
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/CMakeFiles/poller
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/CMakeFiles/poller.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/CMakeFiles/poller-complete.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-build.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-configure.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-download.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-install.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-mkdir.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-patch.rule
+C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/poller-prefix/src/poller-stamp/poller-update.rule
