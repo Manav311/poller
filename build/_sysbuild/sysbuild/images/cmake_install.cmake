@@ -34,26 +34,26 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/ncs-inter/l7/l7_e1_sol/app/build/_sysbuild/sysbuild/images/bootloader/cmake_install.cmake")
+  include("C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/bootloader/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/ncs-inter/l7/l7_e1_sol/app/build/modules/nrf/cmake_install.cmake")
+  include("C:/Users/manav/OneDrive/Desktop/poller/build/modules/nrf/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/ncs-inter/l7/l7_e1_sol/app/build/modules/mcuboot/cmake_install.cmake")
+  include("C:/Users/manav/OneDrive/Desktop/poller/build/modules/mcuboot/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/ncs-inter/l7/l7_e1_sol/app/build/_sysbuild/sysbuild/images/boards/cmake_install.cmake")
+  include("C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/boards/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/ncs-inter/l7/l7_e1_sol/app/build/_sysbuild/sysbuild/images/soc/cmake_install.cmake")
+  include("C:/Users/manav/OneDrive/Desktop/poller/build/_sysbuild/sysbuild/images/soc/cmake_install.cmake")
 endif()
 

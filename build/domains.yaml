@@ -1,7 +1,7 @@
-default: app
-build_dir: C:/ncs-inter/l7/l7_e1_sol/app/build
+default: poller
+build_dir: C:/Users/manav/OneDrive/Desktop/poller/build
 domains:
-  - name: app
-    build_dir: C:/ncs-inter/l7/l7_e1_sol/app/build/app
+  - name: poller
+    build_dir: C:/Users/manav/OneDrive/Desktop/poller/build/poller
 flash_order:
-  - app
+  - poller

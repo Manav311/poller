@@ -1,8 +1,8 @@
-C:\ncs-inter\l7\l7_e1_sol\app\build\Kconfig\Kconfig.sysbuild.modules
-C:\ncs-inter\l7\l7_e1_sol\app\build\Kconfig\boards\Kconfig.nrf52840dk
-C:\ncs-inter\l7\l7_e1_sol\app\build\Kconfig\boards\Kconfig.sysbuild
-C:\ncs-inter\l7\l7_e1_sol\app\build\Kconfig\soc\Kconfig.soc
-C:\ncs-inter\l7\l7_e1_sol\app\build\Kconfig\soc\Kconfig.sysbuild
+C:\Users\manav\OneDrive\Desktop\poller\build\Kconfig\Kconfig.sysbuild.modules
+C:\Users\manav\OneDrive\Desktop\poller\build\Kconfig\boards\Kconfig.nrf52840dk
+C:\Users\manav\OneDrive\Desktop\poller\build\Kconfig\boards\Kconfig.sysbuild
+C:\Users\manav\OneDrive\Desktop\poller\build\Kconfig\soc\Kconfig.soc
+C:\Users\manav\OneDrive\Desktop\poller\build\Kconfig\soc\Kconfig.sysbuild
 C:\ncs\v3.0.0\nrf\soc\nordic\Kconfig.soc
 C:\ncs\v3.0.0\nrf\soc\nordic\nrf54l\Kconfig.soc
 C:\ncs\v3.0.0\nrf\soc\nordic\nrf71\Kconfig.soc
