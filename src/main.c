@@ -18,6 +18,8 @@
      int err;
 
      //ReturnCode err1 = rfalNfcInitialize();
+
+     err = st25r_spi_init();
  
      LOG_INF("Lesson 7 - Exercise 1 started");
  
